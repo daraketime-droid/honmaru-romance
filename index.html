@@ -56,12 +56,31 @@ function renderStart(){$("starterChoices").innerHTML=starters.map(n=>`<button on
 function chooseStarter(n){starter=n;aff={};all.forEach(x=>aff[x]=30);day=1;warnings=0;visitedOther=false;otherVisits=0;ended=false;visitedTargets=new Set();routeTargets=new Set();log=[];$("start").classList.add("hidden");$("game").classList.remove("hidden");$("starterLabel").textContent="初期刀："+starter;addLog(starter+"を初期刀に選んだ。");showDay()}
 function renderStatus(){$("status").innerHTML=all.map(n=>`<div class="stat"><b>${n}</b><span>${aff[n]}</span>${routeTargets.has(n)?'<div class="note"><b>恋愛ルート進行中</b></div>':''}<div class="bar"><i style="width:${Math.max(0,Math.min(100,aff[n]))}%"></i></div></div>`).join("")}
 function showDay(){if(ended)return;const m=monthOf(day),d=dayOfMonth(day);$("dayTitle").textContent=m+"ヶ月目・"+d+"日目";$("yearProgress").style.width=((day-1)/TOTAL_DAYS*100)+"%";$("timeInfo").textContent=`一年間の ${day}/${TOTAL_DAYS} 日目　｜　${safePeriod()?"1ヶ月目：エンディング判定なし":"通常期間（条件により分岐）"}`;$("sceneText").textContent=day===1?starter+"と朝の挨拶を交わした。今日は誰と過ごそうか。":"朝になった。"+starter+"はいつものように、あなたの様子をうかがっている。";renderStatus();$("choicePanel").classList.remove("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.add("hidden");$("choiceTitle").textContent="今日、誰と過ごす？";$("choiceHint").textContent="今日は1回だけ行動できます。初期刀以外を選んでも、日々の選択履歴は残ります。";$("choices").innerHTML=all.map(n=>`<button onclick="chooseTarget('${n}')"><div class="sword"><b>${n}</b><span class="pill">好感度 ${aff[n]}</span></div></button>`).join("")}
-function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";$("resultText").textContent=n===starter?starter+"は、あなたが自分を選んだことに少し安心したようだ。":"あなたは"+n+"と過ごした。ふと視線を感じる。"+starter+"は何も言わない。";$("resultChoices").innerHTML=`<button onclick="reply(1)">「君と話したかった」</button><button onclick="reply(0)">いつも通りに会話する</button><button onclick="reply(-1)">「また今度にしよう」</button>`}
-function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));let line=delta>0?target+"の表情が和らいだ。好感度 +5。":delta<0?target+"は少し寂しそうに目を伏せた。好感度 -5。":target+"と穏やかな時間を過ごした。好感度の変化はない。";if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";if(target!==starter&&aff[target]>=70&&!routeTargets.has(target)){routeTargets.add(target);line+="\n\n"+target+"との距離が縮まり、恋愛ルートに入った。";}addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
-function advanceDay(){if(ended)return;$("resultPanel").classList.add("hidden");if(!safePeriod()){const end=checkEnding(false);if(end){finish(end[0],end[1]);return}}if(day>=TOTAL_DAYS){const end=checkEnding(true);if(end){finish(end[0],end[1]);return}finish("一年の終わり","一年間の本丸での日々が過ぎた。あなたが築いた関係は、これからも続いていく。");return}day++;if(dayOfMonth(day)===1)addLog(monthOf(day)+"ヶ月目に入った。");showDay()}
+function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}
+ if(!safePeriod()){
+  let end=null;
+  if(n!==starter){
+   if(aff[n]<=10)end=["バッドエンド",n+"の好感度は限界まで下がってしまった。もう、あなたに向けられる想いは残っていない。"];
+   else end=checkEnding(false);
+   if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}
+  }else end=checkSelfEnding();
+  if(end){finish(end[0],end[1]);return}
+ }
+ addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";$("resultText").textContent=n===starter?starter+"は、あなたが自分を選んだことに少し安心したようだ。":"あなたは"+n+"と過ごした。ふと視線を感じる。"+starter+"は何も言わない。";$("resultChoices").innerHTML=`<button onclick="reply(1)">「君と話したかった」</button><button onclick="reply(0)">いつも通りに会話する</button><button onclick="reply(-1)">「また今度にしよう」</button>`}
+function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));let line=delta>0?target+"の表情が和らいだ。好感度 +5。":delta<0?target+"は少し寂しそうに目を伏せた。好感度 -5。":target+"と穏やかな時間を過ごした。好感度の変化はない。";if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
+function advanceDay(){if(ended)return;$("resultPanel").classList.add("hidden");if(day>=TOTAL_DAYS){const romance=[...routeTargets].filter(x=>aff[x]>=70).sort((x,y)=>aff[y]-aff[x]);if(romance.length)finish("恋愛エンド","一年間を通して、あなたと"+romance[0]+"は互いの想いを確かめ合った。これからは、恋人として同じ時間を歩んでいく。");else finish("一年の終わり","一年間の本丸での日々が過ぎた。あなたが築いた関係は、これからも続いていく。");return}day++;if(dayOfMonth(day)===1)addLog(monthOf(day)+"ヶ月目に入った。");showDay()}
+function checkSelfEnding(){const n=starter,a=aff[starter];
+ if(n==="加州清光"&&a<=40)return ["死亡エンド","「なんで愛してくれないの」清光は笑っているのに、その目は少しも笑っていなかった。"];
+ if(n==="山姥切国広"&&a<=10)return ["死亡エンド","「やはり写しなど……はは、あんたも値踏みするんだな」国広は自嘲するように笑った。"];
+ if(n==="陸奥守吉行"&&a<0)return ["死亡エンド","守ると決めた相手を失った陸奥守は、もう戻ってこなかった。"];
+ if(n==="陸奥守吉行"&&a>=100)return ["結婚エンド","「わしと一緒に、新しい時代を作っていこうぜよ！」陸奥守はあなたの手を取った。"];
+ if(n==="蜂須賀虎徹"&&a<=10)return ["追放エンド","「主として認めるわけにはいかない」蜂須賀は静かに告げた。"];
+ if(n==="蜂須賀虎徹"&&a>100)return ["神隠しエンド","蜂須賀はあなたを抱き寄せる。「この先は、誰にも邪魔させない」"];
+ if(n==="歌仙兼定"&&a<0)return ["追放エンド","「風雅を解さぬ主に仕えるのは、ここまでだ」歌仙は本丸を去った。"];
+ if(n==="歌仙兼定"&&a<=20)return ["疎遠エンド","歌仙はあなたを避けるようになった。話しかけても、返事は短い。"];
+ if(n==="歌仙兼定"&&a>=90)return ["執着エンド","歌仙の溜め込んだ想いが一気にあふれた。逃げ道は、もうない。"];
+ return null}
 function checkEnding(finalCheck){const n=starter,a=aff[n];
- for(const other of others){if(aff[other]<=10)return ["バッドエンド",""+other+"の好感度は限界まで下がってしまった。もう、あなたに向けられる想いは残っていない。"];}
-
  if(n==="加州清光"&&a<=40)return ["死亡エンド","「なんで愛してくれないの」清光は笑っているのに、その目は少しも笑っていなかった。"];
  if(n==="山姥切国広"&&a<=10)return ["死亡エンド","「やはり写しなど……はは、あんたも値踏みするんだな」国広は自嘲するように笑った。"];
  if(n==="陸奥守吉行"&&a<0)return ["死亡エンド","守ると決めた相手を失った陸奥守は、もう戻ってこなかった。"];
