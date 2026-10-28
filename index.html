@@ -24,7 +24,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:white;t
 <section id="start" class="panel">
 <h2>はじめに</h2>
 <p>初期刀を一振り選んでください。全員の初期好感度は30です。</p>
-<p>一年間は12ヶ月、1ヶ月は7日、1日1回行動します。最初の1ヶ月は好感度が変動してもエンディング判定を行いません。2ヶ月目から通常判定になります。</p>
+<p>一年間は12ヶ月、1ヶ月は7日、1日1回行動します。最初の1ヶ月は好感度が変動してもエンディング判定を行いません。2ヶ月目から通常判定になります。会話と返答の選択肢は日ごとにランダムで変わります。</p>
 <div id="starterChoices" class="grid two"></div>
 <p class="note">ファンメイドの試作版です。選択肢や好感度、時間システムを試すためのものです。</p>
 </section>
@@ -56,6 +56,83 @@ function renderStart(){$("starterChoices").innerHTML=starters.map(n=>`<button on
 function chooseStarter(n){starter=n;aff={};all.forEach(x=>aff[x]=30);day=1;warnings=0;visitedOther=false;otherVisits=0;ended=false;visitedTargets=new Set();routeTargets=new Set();log=[];$("start").classList.add("hidden");$("game").classList.remove("hidden");$("starterLabel").textContent="初期刀："+starter;addLog(starter+"を初期刀に選んだ。");showDay()}
 function renderStatus(){$("status").innerHTML=all.map(n=>`<div class="stat"><b>${n}</b><span>${aff[n]}</span>${routeTargets.has(n)?'<div class="note"><b>恋愛ルート進行中</b></div>':''}<div class="bar"><i style="width:${Math.max(0,Math.min(100,aff[n]))}%"></i></div></div>`).join("")}
 function showDay(){if(ended)return;const m=monthOf(day),d=dayOfMonth(day);$("dayTitle").textContent=m+"ヶ月目・"+d+"日目";$("yearProgress").style.width=((day-1)/TOTAL_DAYS*100)+"%";$("timeInfo").textContent=`一年間の ${day}/${TOTAL_DAYS} 日目　｜　${safePeriod()?"1ヶ月目：エンディング判定なし":"通常期間（条件により分岐）"}`;$("sceneText").textContent=day===1?starter+"と朝の挨拶を交わした。今日は誰と過ごそうか。":"朝になった。"+starter+"はいつものように、あなたの様子をうかがっている。";renderStatus();$("choicePanel").classList.remove("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.add("hidden");$("choiceTitle").textContent="今日、誰と過ごす？";$("choiceHint").textContent="今日は1回だけ行動できます。初期刀以外を選んでも、日々の選択履歴は残ります。";$("choices").innerHTML=all.map(n=>`<button onclick="chooseTarget('${n}')"><div class="sword"><b>${n}</b><span class="pill">好感度 ${aff[n]}</span></div></button>`).join("")}
+const scenes={
+"加州清光":[
+"清光は鏡の前で髪を整えていた。「ねえ、今日の俺、かわいくない？」",
+"廊下で清光と鉢合わせた。彼は一瞬驚いてから、いつもの笑顔を見せる。",
+"清光は手入れ道具を片づけながら、ちらりとこちらを見た。「用があるなら、早く言ってよね」",
+"縁側に座った清光が、隣の場所をぽんぽんと叩いた。「ここ、空いてるよ」"
+],
+"山姥切国広":[
+"国広は布を整えながら、こちらをうかがっている。「……何か用か？」",
+"国広は庭を眺めていた。近づくと、少しだけ場所を空けてくれる。",
+"「俺なんかを選んでいいのか」国広はそう言いながらも、立ち去ろうとはしなかった。",
+"国広は本を閉じ、控えめに視線を向けた。「……少しなら、付き合う」"
+],
+"陸奥守吉行":[
+"陸奥守は縁側で空を見上げていた。「おっ、ええところに来たのう！」",
+"「今日は何をしようかのう！」陸奥守は楽しげに立ち上がった。",
+"陸奥守が手入れ道具を抱えて走ってきた。「ちょうど手伝うてほしいことがあったんじゃ」",
+"庭先から陸奥守の笑い声が聞こえる。あなたに気づくと大きく手を振った。"
+],
+"蜂須賀虎徹":[
+"蜂須賀は刀身を丁寧に磨いていた。「来たのか。少し待っていてくれ」",
+"蜂須賀は姿勢を正してあなたを迎えた。「今日は何を話そうか」",
+"「本物であることに誇りを持つ。それは大切なことだ」蜂須賀は静かに語り始めた。",
+"蜂須賀は庭の花を眺めていた。あなたに気づくと、穏やかに微笑む。"
+],
+"歌仙兼定":[
+"歌仙は花を生けていた。「季節の移ろいを感じるね。君もそう思わないかい？」",
+"「風流を解さない話でなければ、聞こう」歌仙は筆を置いた。",
+"歌仙は茶を用意していた。「ちょうど一服しようと思っていたところだよ」",
+"歌仙は庭の景色を眺めながら、今日の空の色について語り始めた。"
+],
+"山姥切長義":[
+"長義は書類から顔を上げた。「君か。ちょうど一息入れようと思っていた」",
+"「当然、俺が選ばれると思っていたよ」長義は涼しい顔で笑った。",
+"長義は刀装を点検していた。あなたに気づくと、手を止めて向き直る。",
+"「話があるなら聞こう。君の時間を無駄にはしないさ」"
+],
+"大和守安定":[
+"安定は稽古のあと、額の汗を拭っていた。「あ、来てくれたんだ」",
+"「今日は何して遊ぶ？　それとも、ゆっくり話す？」安定は笑顔で首をかしげた。",
+"安定は花壇の前でしゃがみ込んでいた。小さな花を見つけたらしい。",
+"「ねえ、少しだけ付き合ってくれる？」安定はどこか言いにくそうに切り出した。"
+],
+"肥前忠広":[
+"肥前は縁側で刀の手入れをしていた。「……何だよ。用があるなら言え」",
+"「暇つぶしか？　まあ、座れよ」肥前は隣を顎で示した。",
+"肥前は猫を追い払おうとしていたが、猫のほうが堂々としている。",
+"「別に待ってたわけじゃねえ」肥前は目をそらして言った。"
+],
+"南海太郎朝尊":[
+"南海は机いっぱいに資料を広げていた。「おや、実にいいところへ来たね」",
+"「少し実験に付き合ってくれないかい？　安全性は……たぶん問題ないよ」",
+"南海は何かを記録していた。「人の心の動きも、観察すると興味深いね」",
+"「今日は君に聞きたいことがあってね」南海は眼鏡を直した。"
+],
+"浦島虎徹":[
+"浦島は亀吉と遊んでいた。「あっ、主さん！　一緒に遊ぼうよ！」",
+"「今日は何して遊ぶ？　海の話でもする？」浦島は目を輝かせた。",
+"浦島は手作りのおやつを持ってきた。「よかったら一緒に食べない？」",
+"浦島が廊下の向こうから駆けてきた。「ちょうど会いたいと思ってたんだ！」"
+],
+"長曽祢虎徹":[
+"長曽祢は稽古場で木刀を振っていた。「おう、少し休憩するか」",
+"「鍛錬も大事だが、休むことも必要だ」長曽祢は穏やかに笑った。",
+"長曽祢は道具を片づけていた。「手伝ってくれるのか？　助かる」",
+"「何か悩みでもあるのか」長曽祢は真剣な顔でこちらを見た。"
+]};
+const responseOptions=[
+{label:"素直に気持ちを伝える",delta:1},
+{label:"相手の話をじっくり聞く",delta:1},
+{label:"一緒に何かをして過ごす",delta:1},
+{label:"いつも通りに会話する",delta:0},
+{label:"少しからかってみる",delta:0},
+{label:"用事を思い出して切り上げる",delta:-1},
+{label:"そっけなく返事をする",delta:-1}
+];
+function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}
  if(!safePeriod()){
   let end=null;
@@ -66,8 +143,32 @@ function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=t
   }else end=checkSelfEnding();
   if(end){finish(end[0],end[1]);return}
  }
- addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";$("resultText").textContent=n===starter?starter+"は、あなたが自分を選んだことに少し安心したようだ。":"あなたは"+n+"と過ごした。ふと視線を感じる。"+starter+"は何も言わない。";$("resultChoices").innerHTML=`<button onclick="reply(1)">「君と話したかった」</button><button onclick="reply(0)">いつも通りに会話する</button><button onclick="reply(-1)">「また今度にしよう」</button>`}
-function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));let line=delta>0?target+"の表情が和らいだ。好感度 +5。":delta<0?target+"は少し寂しそうに目を伏せた。好感度 -5。":target+"と穏やかな時間を過ごした。好感度の変化はない。";if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
+ addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";
+ const pool=scenes[n]||[n+"はあなたに気づき、話しかけてきた。"];
+ $("resultText").textContent=pool[Math.floor(Math.random()*pool.length)];
+ const options=shuffle(responseOptions).slice(0,4);
+ $("resultChoices").innerHTML=options.map((o,i)=>`<button onclick="reply(${o.delta})">${o.label}</button>`).join("");
+}
+function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));
+ const reactions=delta>0?[
+ target+"は嬉しそうに笑った。好感度 +5。",
+ target+"は少し照れたように視線をそらした。好感度 +5。",
+ target+"は「また話そう」と、いつもより柔らかな声で言った。好感度 +5。",
+ target+"はあなたの言葉を大切そうに受け止めた。好感度 +5。"
+ ]:delta<0?[
+ target+"は小さく息をつき、距離を置いた。好感度 -5。",
+ target+"の表情から笑みが消えた。好感度 -5。",
+ target+"は「そうか」とだけ答えた。好感度 -5。",
+ target+"は何も言わず、話題を変えた。好感度 -5。"
+ ]:[
+ target+"は気負わずに話せたことを喜んでいるようだ。好感度の変化はない。",
+ target+"との間に、いつも通りの穏やかな時間が流れた。好感度の変化はない。",
+ target+"は安心したように微笑んだ。好感度の変化はない。",
+ target+"は他愛ない話に付き合ってくれた。好感度の変化はない。"
+ ];
+ let line=reactions[Math.floor(Math.random()*reactions.length)];
+ if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";
+ addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
 function advanceDay(){if(ended)return;$("resultPanel").classList.add("hidden");if(day>=TOTAL_DAYS){const romance=[...routeTargets].filter(x=>aff[x]>=70).sort((x,y)=>aff[y]-aff[x]);if(romance.length)finish("恋愛エンド","一年間を通して、あなたと"+romance[0]+"は互いの想いを確かめ合った。これからは、恋人として同じ時間を歩んでいく。");else finish("一年の終わり","一年間の本丸での日々が過ぎた。あなたが築いた関係は、これからも続いていく。");return}day++;if(dayOfMonth(day)===1)addLog(monthOf(day)+"ヶ月目に入った。");showDay()}
 function checkSelfEnding(){const n=starter,a=aff[starter];
  if(n==="加州清光"&&a<=40)return ["死亡エンド","「なんで愛してくれないの」清光は笑っているのに、その目は少しも笑っていなかった。"];
