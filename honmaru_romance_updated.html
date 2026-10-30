@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#24263b">
+<title>本丸恋愛シミュレーター</title>
+<style>
+:root{--bg:#f5f1e9;--card:#fffdf8;--ink:#28283a;--muted:#706d7b;--accent:#873f59;--line:#ded6cb;--gold:#b58a46}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.6}
+header{background:#24263b;color:#fff;padding:22px 18px 18px;text-align:center;border-bottom:4px solid var(--gold)}header h1{font-size:1.3rem;margin:0 0 4px;letter-spacing:.08em}header p{margin:0;color:#e3dce2;font-size:.83rem}
+main{max-width:760px;margin:0 auto;padding:16px 13px 42px}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;margin:0 0 14px;box-shadow:0 3px 12px #30243a0a}
+h2{font-size:1.08rem;margin:0 0 10px}h3{font-size:.98rem;margin:0 0 7px}.sub{color:var(--muted);font-size:.88rem;margin:4px 0 12px}
+button{font:inherit;border:1px solid #c9b8b7;background:#fff9f7;color:var(--ink);border-radius:12px;padding:12px 13px;min-height:46px;cursor:pointer;text-align:left;width:100%;margin:5px 0}
+button.primary{background:var(--accent);border-color:var(--accent);color:white;text-align:center;font-weight:700}button.secondary{background:#f1e8e5}.grid{display:grid;grid-template-columns:1fr;gap:7px}.sword{display:flex;justify-content:space-between;gap:12px;align-items:center}.pill{display:inline-block;background:#eee6dc;border-radius:99px;padding:3px 9px;font-size:.78rem;white-space:nowrap}
+.status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{background:#f7f0e9;border-radius:10px;padding:10px}.stat b{display:block;font-size:.85rem}.stat span{font-size:1.15rem;font-weight:700;color:var(--accent)}.bar{height:7px;background:#e4dcd3;border-radius:99px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--accent)}
+.log{white-space:pre-wrap;background:#f8f4ef;border-radius:10px;padding:12px;font-size:.9rem;min-height:56px}.hidden{display:none!important}.ending{border:2px solid var(--accent);background:#fff4f2}.note{font-size:.8rem;color:var(--muted)}.progress{height:8px;background:#e4dcd3;border-radius:99px;overflow:hidden;margin:8px 0}.progress i{display:block;height:100%;background:var(--gold)}
+@media(min-width:560px){.grid.two{grid-template-columns:1fr 1fr}.status{grid-template-columns:repeat(3,minmax(0,1fr))}main{padding-top:22px}}
+</style>
+</head>
+<body>
+<header><h1>本丸恋愛シミュレーター</h1><p>一年間の選択が、刀剣男士たちとの関係を変えていく。</p></header>
+<main>
+<section id="start" class="panel">
+<h2>はじめに</h2>
+<p>初期刀を一振り選んでください。全員の初期好感度は30です。</p>
+<p>一年間は12ヶ月、1ヶ月は7日、1日1回行動します。最初の1ヶ月は好感度が変動してもエンディング判定を行いません。2ヶ月目から通常判定になります。会話と返答の選択肢は日ごとにランダムで変わります。</p>
+<div id="starterChoices" class="grid two"></div>
+<p class="note">ファンメイドの試作版です。選択肢や好感度、時間システムを試すためのものです。</p>
+</section>
+<section id="game" class="hidden">
+<div class="panel">
+<div class="sword"><h2 id="dayTitle">1ヶ月目・1日目</h2><span class="pill" id="starterLabel"></span></div>
+<div class="progress"><i id="yearProgress" style="width:0%"></i></div>
+<p id="timeInfo" class="sub"></p>
+<p id="sceneText" class="sub"></p>
+<p id="ambientText" class="sub"></p>
+<div id="status" class="status"></div>
+</div>
+<div id="choicePanel" class="panel"><h2 id="choiceTitle">今日、誰と過ごす？</h2><p id="choiceHint" class="sub"></p><div id="choices" class="grid two"></div></div>
+<div id="resultPanel" class="panel hidden"><h2 id="resultTitle">会話</h2><div id="resultText" class="log"></div><div id="resultChoices"></div></div>
+<div id="endingPanel" class="panel ending hidden"><h2 id="endingTitle">結末</h2><p id="endingText"></p><button class="primary" onclick="restart()">最初から遊ぶ</button></div>
+<div class="panel"><h2>本日の記録</h2><div id="log" class="log">まだ記録はありません。</div><button class="secondary" onclick="restart()">最初からやり直す</button></div>
+</section>
+</main>
+<script>
+const starters=["加州清光","山姥切国広","陸奥守吉行","蜂須賀虎徹","歌仙兼定"];
+const others=["山姥切長義","大和守安定","肥前忠広","南海太郎朝尊","浦島虎徹","長曽祢虎徹"];
+const all=[...starters,...others], DAYS_PER_MONTH=7, MONTHS=12, SAFE_DAYS=7, TOTAL_DAYS=DAYS_PER_MONTH*MONTHS;
+let starter="",day=1,aff={},log=[],target="",visitedOther=false,otherVisits=0,warnings=0,ended=false,visitedTargets=new Set(),routeTargets=new Set();
+const $=id=>document.getElementById(id);
+function addLog(s){log.unshift("【"+monthOf(day)+"ヶ月目・"+dayOfMonth(day)+"日目】 "+s);$("log").textContent=log.slice(0,10).join("\n")}
+function monthOf(d){return Math.min(MONTHS,Math.ceil(d/DAYS_PER_MONTH))}
+function dayOfMonth(d){return ((d-1)%DAYS_PER_MONTH)+1}
+function safePeriod(){return day<=SAFE_DAYS}
+function renderStart(){$("starterChoices").innerHTML=starters.map(n=>`<button onclick="chooseStarter('${n}')"><b>${n}</b><br><small>初期好感度 30</small></button>`).join("")}
+function chooseStarter(n){starter=n;aff={};all.forEach(x=>aff[x]=30);day=1;warnings=0;visitedOther=false;otherVisits=0;ended=false;visitedTargets=new Set();routeTargets=new Set();log=[];$("start").classList.add("hidden");$("game").classList.remove("hidden");$("starterLabel").textContent="初期刀："+starter;addLog(starter+"を初期刀に選んだ。");showDay()}
+function affinityMood(n){const a=aff[n];if(a<=10)return "距離を置かれている";if(a<30)return "まだ少しよそよそしい";if(a<50)return "いつも通りに接している";if(a<70)return "あなたを気にかけている";return "特別な想いを抱いている"}
+function renderStatus(){$("status").innerHTML=all.map(n=>`<div class="stat"><b>${n}</b><span>${aff[n]}</span><div class="note">${affinityMood(n)}${routeTargets.has(n)?'・恋愛ルート進行中':''}</div><div class="bar"><i style="width:${Math.max(0,Math.min(100,aff[n]))}%"></i></div></div>`).join("")}
+function affinityDialogue(n){const a=aff[n];if(a<=10)return n+"はあなたに気づくと、何も言わずに視線をそらした。";if(a<30)return n+"は少し迷った様子で会釈をした。";if(a<50)return n+"はいつも通りに挨拶を交わした。";if(a<70)return n+"はあなたの様子を気にして、さりげなく声をかけた。";return n+"はあなたを見つけると、嬉しそうに表情を和らげた。"}
+function showDay(){if(ended)return;const m=monthOf(day),d=dayOfMonth(day);$("dayTitle").textContent=m+"ヶ月目・"+d+"日目";$("yearProgress").style.width=((day-1)/TOTAL_DAYS*100)+"%";$("timeInfo").textContent=`一年間の ${day}/${TOTAL_DAYS} 日目　｜　${safePeriod()?"1ヶ月目：エンディング判定なし":"通常期間（条件により分岐）"}`;$("sceneText").textContent=day===1?starter+"と朝の挨拶を交わした。今日は誰と過ごそうか。":"朝になった。"+starter+"はいつものように、あなたの様子をうかがっている。";const bystanders=shuffle(all.filter(n=>n!==starter)).slice(0,2);$("ambientText").textContent="本丸の様子："+bystanders.map(affinityDialogue).join(" ");renderStatus();$("choicePanel").classList.remove("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.add("hidden");$("choiceTitle").textContent="今日、誰と過ごす？";$("choiceHint").textContent="今日は1回だけ行動できます。初期刀以外を選んでも、日々の選択履歴は残ります。";$("choices").innerHTML=all.map(n=>`<button onclick="chooseTarget('${n}')"><div class="sword"><b>${n}</b><span class="pill">好感度 ${aff[n]}</span></div></button>`).join("")}
+const scenes={
+"加州清光":[
+"清光は鏡の前で髪を整えていた。「ねえ、今日の俺、かわいくない？」",
+"廊下で清光と鉢合わせた。彼は一瞬驚いてから、いつもの笑顔を見せる。",
+"清光は手入れ道具を片づけながら、ちらりとこちらを見た。「用があるなら、早く言ってよね」",
+"縁側に座った清光が、隣の場所をぽんぽんと叩いた。「ここ、空いてるよ」"
+],
+"山姥切国広":[
+"国広は布を整えながら、こちらをうかがっている。「……何か用か？」",
+"国広は庭を眺めていた。近づくと、少しだけ場所を空けてくれる。",
+"「俺なんかを選んでいいのか」国広はそう言いながらも、立ち去ろうとはしなかった。",
+"国広は本を閉じ、控えめに視線を向けた。「……少しなら、付き合う」"
+],
+"陸奥守吉行":[
+"陸奥守は縁側で空を見上げていた。「おっ、ええところに来たのう！」",
+"「今日は何をしようかのう！」陸奥守は楽しげに立ち上がった。",
+"陸奥守が手入れ道具を抱えて走ってきた。「ちょうど手伝うてほしいことがあったんじゃ」",
+"庭先から陸奥守の笑い声が聞こえる。あなたに気づくと大きく手を振った。"
+],
+"蜂須賀虎徹":[
+"蜂須賀は刀身を丁寧に磨いていた。「来たのか。少し待っていてくれ」",
+"蜂須賀は姿勢を正してあなたを迎えた。「今日は何を話そうか」",
+"「本物であることに誇りを持つ。それは大切なことだ」蜂須賀は静かに語り始めた。",
+"蜂須賀は庭の花を眺めていた。あなたに気づくと、穏やかに微笑む。"
+],
+"歌仙兼定":[
+"歌仙は花を生けていた。「季節の移ろいを感じるね。君もそう思わないかい？」",
+"「風流を解さない話でなければ、聞こう」歌仙は筆を置いた。",
+"歌仙は茶を用意していた。「ちょうど一服しようと思っていたところだよ」",
+"歌仙は庭の景色を眺めながら、今日の空の色について語り始めた。"
+],
+"山姥切長義":[
+"長義は書類から顔を上げた。「君か。ちょうど一息入れようと思っていた」",
+"「当然、俺が選ばれると思っていたよ」長義は涼しい顔で笑った。",
+"長義は刀装を点検していた。あなたに気づくと、手を止めて向き直る。",
+"「話があるなら聞こう。君の時間を無駄にはしないさ」"
+],
+"大和守安定":[
+"安定は稽古のあと、額の汗を拭っていた。「あ、来てくれたんだ」",
+"「今日は何して遊ぶ？　それとも、ゆっくり話す？」安定は笑顔で首をかしげた。",
+"安定は花壇の前でしゃがみ込んでいた。小さな花を見つけたらしい。",
+"「ねえ、少しだけ付き合ってくれる？」安定はどこか言いにくそうに切り出した。"
+],
+"肥前忠広":[
+"肥前は縁側で刀の手入れをしていた。「……何だよ。用があるなら言え」",
+"「暇つぶしか？　まあ、座れよ」肥前は隣を顎で示した。",
+"肥前は猫を追い払おうとしていたが、猫のほうが堂々としている。",
+"「別に待ってたわけじゃねえ」肥前は目をそらして言った。"
+],
+"南海太郎朝尊":[
+"南海は机いっぱいに資料を広げていた。「おや、実にいいところへ来たね」",
+"「少し実験に付き合ってくれないかい？　安全性は……たぶん問題ないよ」",
+"南海は何かを記録していた。「人の心の動きも、観察すると興味深いね」",
+"「今日は君に聞きたいことがあってね」南海は眼鏡を直した。"
+],
+"浦島虎徹":[
+"浦島は亀吉と遊んでいた。「あっ、主さん！　一緒に遊ぼうよ！」",
+"「今日は何して遊ぶ？　海の話でもする？」浦島は目を輝かせた。",
+"浦島は手作りのおやつを持ってきた。「よかったら一緒に食べない？」",
+"浦島が廊下の向こうから駆けてきた。「ちょうど会いたいと思ってたんだ！」"
+],
+"長曽祢虎徹":[
+"長曽祢は稽古場で木刀を振っていた。「おう、少し休憩するか」",
+"「鍛錬も大事だが、休むことも必要だ」長曽祢は穏やかに笑った。",
+"長曽祢は道具を片づけていた。「手伝ってくれるのか？　助かる」",
+"「何か悩みでもあるのか」長曽祢は真剣な顔でこちらを見た。"
+]};
+const responseOptions=[
+{label:"素直に気持ちを伝える",delta:1},
+{label:"相手の話をじっくり聞く",delta:1},
+{label:"一緒に何かをして過ごす",delta:1},
+{label:"いつも通りに会話する",delta:0},
+{label:"少しからかってみる",delta:0},
+{label:"用事を思い出して切り上げる",delta:-1},
+{label:"そっけなく返事をする",delta:-1}
+];
+function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}
+ if(!safePeriod()){
+  let end=null;
+  if(n!==starter){
+   if(aff[n]<=10)end=["バッドエンド",n+"の好感度は限界まで下がってしまった。もう、あなたに向けられる想いは残っていない。"];
+   if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}
+  }else{
+   end=checkSelfEnding();
+   if(!end)end=checkEnding(false);
+   if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}
+  }
+  if(end){finish(end[0],end[1]);return}
+ }
+ addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";
+ const pool=scenes[n]||[n+"はあなたに気づき、話しかけてきた。"];
+ $("resultText").textContent=pool[Math.floor(Math.random()*pool.length)];
+ const options=shuffle(responseOptions).slice(0,4);
+ $("resultChoices").innerHTML=options.map((o,i)=>`<button onclick="reply(${o.delta})">${o.label}</button>`).join("");
+}
+function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));
+ const reactions=delta>0?[
+ target+"は嬉しそうに笑った。好感度 +5。",
+ target+"は少し照れたように視線をそらした。好感度 +5。",
+ target+"は「また話そう」と、いつもより柔らかな声で言った。好感度 +5。",
+ target+"はあなたの言葉を大切そうに受け止めた。好感度 +5。"
+ ]:delta<0?[
+ target+"は小さく息をつき、距離を置いた。好感度 -5。",
+ target+"の表情から笑みが消えた。好感度 -5。",
+ target+"は「そうか」とだけ答えた。好感度 -5。",
+ target+"は何も言わず、話題を変えた。好感度 -5。"
+ ]:[
+ target+"は気負わずに話せたことを喜んでいるようだ。好感度の変化はない。",
+ target+"との間に、いつも通りの穏やかな時間が流れた。好感度の変化はない。",
+ target+"は安心したように微笑んだ。好感度の変化はない。",
+ target+"は他愛ない話に付き合ってくれた。好感度の変化はない。"
+ ];
+ let line=reactions[Math.floor(Math.random()*reactions.length)];
+ if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";
+ addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
+function advanceDay(){if(ended)return;$("resultPanel").classList.add("hidden");if(day>=TOTAL_DAYS){const romance=[...routeTargets].filter(x=>aff[x]>=70).sort((x,y)=>aff[y]-aff[x]);if(romance.length)finish("恋愛エンド","一年間を通して、あなたと"+romance[0]+"は互いの想いを確かめ合った。これからは、恋人として同じ時間を歩んでいく。");else finish("一年の終わり","一年間の本丸での日々が過ぎた。あなたが築いた関係は、これからも続いていく。");return}day++;if(dayOfMonth(day)===1)addLog(monthOf(day)+"ヶ月目に入った。");showDay()}
+function checkSelfEnding(){const n=starter,a=aff[starter];
+ if(n==="加州清光"&&a<=40)return ["死亡エンド","「なんで愛してくれないの」清光は笑っているのに、その目は少しも笑っていなかった。"];
+ if(n==="山姥切国広"&&a<=10)return ["死亡エンド","「やはり写しなど……はは、あんたも値踏みするんだな」国広は自嘲するように笑った。"];
+ if(n==="陸奥守吉行"&&a<0)return ["死亡エンド","守ると決めた相手を失った陸奥守は、もう戻ってこなかった。"];
+ if(n==="陸奥守吉行"&&a>=100)return ["結婚エンド","「わしと一緒に、新しい時代を作っていこうぜよ！」陸奥守はあなたの手を取った。"];
+ if(n==="蜂須賀虎徹"&&a<=10)return ["追放エンド","「主として認めるわけにはいかない」蜂須賀は静かに告げた。"];
+ if(n==="蜂須賀虎徹"&&a>100)return ["神隠しエンド","蜂須賀はあなたを抱き寄せる。「この先は、誰にも邪魔させない」"];
+ if(n==="歌仙兼定"&&a<0)return ["追放エンド","「風雅を解さぬ主に仕えるのは、ここまでだ」歌仙は本丸を去った。"];
+ if(n==="歌仙兼定"&&a<=20)return ["疎遠エンド","歌仙はあなたを避けるようになった。話しかけても、返事は短い。"];
+ if(n==="歌仙兼定"&&a>=90)return ["執着エンド","歌仙の溜め込んだ想いが一気にあふれた。逃げ道は、もうない。"];
+ return null}
+function checkEnding(finalCheck){const n=starter,a=aff[n];
+ if(n==="加州清光"&&a<=40)return ["死亡エンド","「なんで愛してくれないの」清光は笑っているのに、その目は少しも笑っていなかった。"];
+ if(n==="山姥切国広"&&a<=10)return ["死亡エンド","「やはり写しなど……はは、あんたも値踏みするんだな」国広は自嘲するように笑った。"];
+ if(n==="陸奥守吉行"&&a<0)return ["死亡エンド","守ると決めた相手を失った陸奥守は、もう戻ってこなかった。"];
+ if(n==="蜂須賀虎徹"&&a<=10)return ["追放エンド","「主として認めるわけにはいかない」蜂須賀は静かに告げた。"];
+ if(n==="歌仙兼定"&&a<0)return ["追放エンド","「風雅を解さぬ主に仕えるのは、ここまでだ」歌仙は本丸を去った。"];
+ if(n==="歌仙兼定"&&a<=20)return ["疎遠エンド","歌仙はあなたを避けるようになった。話しかけても、返事は短い。"];
+ if(n==="加州清光"&&a>50&&visitedOther)return ["監禁エンド","「なんで俺のこと愛していたんじゃないの？ なんで、なんで、なんで」清光はあなたを離さなかった。"];
+ if(n==="山姥切国広"&&a>=80&&visitedOther&&!visitedTargets.has("山姥切長義"))return ["神隠しエンド","国広はあなたの手を取る。「もう、誰にも渡さない」景色が白くほどけていく。"];
+ if(n==="蜂須賀虎徹"&&visitedTargets.has("長曽祢虎徹"))return ["監禁エンド","長曽祢の名を聞いた瞬間、蜂須賀の表情から温度が消えた。"];
+ if(n==="蜂須賀虎徹"&&a>100)return ["神隠しエンド","蜂須賀はあなたを抱き寄せる。「この先は、誰にも邪魔させない」"];
+ if(n==="歌仙兼定"&&a===90&&visitedOther)return ["死亡エンド","「僕を選ばないのなら、せめて最期は美しく」歌仙は静かに刃を抜いた。"];
+ if(n==="歌仙兼定"&&a>=90)return ["執着エンド","歌仙の溜め込んだ想いが一気にあふれた。逃げ道は、もうない。"];
+ if(n==="陸奥守吉行"&&a>=100)return ["結婚エンド","「わしと一緒に、新しい時代を作っていこうぜよ！」陸奥守はあなたの手を取った。"];
+ if(n==="陸奥守吉行"&&a>=60&&visitedOther){warnings++;if(warnings===1){addLog("陸奥守は寂しそうに笑った。「わしのことも、忘れんといてくれよ」");}else return ["監禁エンド","「一度は我慢した。けんど、もう二度目はないぜよ」陸奥守はあなたを引き留めた。"]}
+ if(n==="加州清光"&&a>=40&&a<=50){addLog("清光はあなたの選択を見守っている。今は、まだ大丈夫そうだ。")}
+ if(n==="山姥切国広"&&a<60){addLog("国広はまだ自分の想いに名前をつけられずにいる。今は他の誰かを応援してくれる。")}
+ if(n==="歌仙兼定"&&a<90){addLog("歌仙は一歩引いて、あなたの選択を尊重している。")}
+ if(n==="蜂須賀虎徹"&&a>=50&&a<=60&&aff["浦島虎徹"]>=30){addLog("蜂須賀は浦島のことを気にかけながら、あなたを見守っている。")}
+ if(n==="蜂須賀虎徹"&&aff["浦島虎徹"]<30){aff[n]=Math.max(-100,aff[n]-5);addLog("浦島を気にかける蜂須賀の好感度が下がった。好感度 -5。")}
+ if(finalCheck){const romance=[...routeTargets].filter(x=>aff[x]>=70).sort((x,y)=>aff[y]-aff[x]);if(romance.length)return ["恋愛エンド","一年間を通して、あなたと"+romance[0]+"は互いの想いを確かめ合った。これからは、恋人として同じ時間を歩んでいく。"];return ["一年の結末","一年間の選択が、あなたと"+starter+"の関係を形作った。"]; }
+ return null}
+function finish(title,txt){ended=true;$("choicePanel").classList.add("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.remove("hidden");$("endingTitle").textContent=title;$("endingText").textContent=txt;$("dayTitle").textContent="物語の結末";$("yearProgress").style.width="100%";addLog("【"+title+"】"+txt);renderStatus()}
+function restart(){$("game").classList.add("hidden");$("start").classList.remove("hidden");$("endingPanel").classList.add("hidden");renderStart();window.scrollTo(0,0)}
+renderStart();
+</script>
+</body>
+</html>
