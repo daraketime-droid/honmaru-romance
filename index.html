@@ -405,6 +405,57 @@ const extraChoices={
 
 function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let currentOptions=[],recentOptions={},recentScenes={};
+
+const contextualChoiceSets=[
+ {test:/花を生け|花器|花瓶|花の向き|花鋏|花びら|草花|花壇|花を一輪|紅葉を数枚|植物を観察|葉の形/,choices:[
+  {label:"花の向きを尋ね、枝を選んだ理由を聞く",min:2,max:8,good:"相手は花を見直し、選んだ理由を丁寧に話してくれた。"},
+  {label:"「この枝は少し傾けたほうがよくない？」と提案する",min:-2,max:6,good:"相手は少し考え、あなたの提案を試してみた。"},
+  {label:"断りなく枝や花器の位置を動かす",min:-10,max:-3,good:"相手は手を止めた。「動かす前にひと言ほしかったね」"},
+  {label:"花の名前を教えてもらい、覚えようとする",min:3,max:9,good:"相手は嬉しそうに花の名と由来を教えてくれた。"},
+  {label:"花より別のことが気になると言って立ち去る",min:-7,max:0,good:"相手は引き止めず、少し残念そうに花へ向き直った."}
+ ]},
+ {test:/和菓子|茶菓子|茶碗|茶を淹れ|お茶|茶器|味見|鍋|料理|握り飯|昼餉|台所|献立/,choices:[
+  {label:"「ひと口味見してもいい？」と頼む",min:2,max:8,good:"相手は少し笑い、味見用に取り分けてくれた。"},
+  {label:"盛りつけや味について、率直な感想を伝える",min:-3,max:7,good:"相手は感想を聞き、どこを直すか考え始めた。"},
+  {label:"自分の分だけでなく、相手の分も用意する",min:4,max:10,good:"相手は意外そうにしたあと、礼を言って隣に座った。"},
+  {label:"許可なく先に食べてしまう",min:-9,max:-2,good:"相手は手を止めた。「せめて声をかけてほしかったね」"},
+  {label:"「一緒に食べよう」と座る場所を空ける",min:3,max:9,good:"相手は隣に腰を下ろし、ゆっくり茶を注いだ。"}
+ ]},
+ {test:/手紙|書きかけ|書き損じ|筆を止め|書類|報告書|記録|帳面|地図|資料|書庫|本を|歌集|本を閉じ|掛け軸/,choices:[
+  {label:"何を書いているのか、相手が話したくなるまで待つ",min:1,max:7,good:"急かされないと分かり、相手は少しずつ事情を話した。"},
+  {label:"誤字や気になる箇所を一緒に確認する",min:2,max:8,good:"相手は紙をこちらへ寄せ、意見を求めた。"},
+  {label:"断りなく紙をのぞき込む",min:-8,max:-2,good:"相手はさっと紙を伏せた。「見ていいとは言っていないよ」"},
+  {label:"「気分転換にお茶でもどう？」と休憩に誘う",min:2,max:9,good:"相手は筆を置き、張りつめていた表情を緩めた。"},
+  {label:"自分ならこう書く、と勝手に書き足す",min:-9,max:1,good:"相手は驚いて紙を引き寄せた。助言より先に確認が必要だったようだ。"}
+ ]},
+ {test:/稽古|木刀|素振り|訓練場|刀の手入れ|刀身|刀装|鞘|手入れ道具|道具の手入れ/,choices:[
+  {label:"動きや手入れの手順について質問する",min:2,max:8,good:"相手は手を止め、要点を分かりやすく説明した。"},
+  {label:"頼まれる前に道具を勝手に触る",min:-8,max:-2,good:"相手は道具を引き寄せ、「扱いには気をつけてくれ」と告げた。"},
+  {label:"終わったら一緒に休もうと誘う",min:3,max:9,good:"相手はひと区切りつけてから、誘いを受けた。"},
+  {label:"自分も手伝えることがあるか尋ねる",min:2,max:7,good:"相手は仕事をひとつ任せ、やり方を教えてくれた。"},
+  {label:"集中している相手に何度も話しかける",min:-7,max:-1,good:"相手は困ったように息をつき、作業へ視線を戻した。"}
+ ]},
+ {test:/雨|夕焼け|空を|庭を眺め|池のそば|縁側|夜の廊下|眠れない|鳥の声|風が|日差し|光が差し/,choices:[
+  {label:"隣に座り、見えている景色について話す",min:2,max:8,good:"相手は景色を見たまま、ぽつりぽつりと話し始めた。"},
+  {label:"温かい飲み物を持ってきて一緒に飲む",min:3,max:9,good:"相手は湯呑みを受け取り、穏やかに礼を言った。"},
+  {label:"黙って隣に座り、相手から話すのを待つ",min:0,max:6,good:"沈黙は気まずくならず、二人で静かな時間を過ごした。"},
+  {label:"景色に興味がないと言ってすぐ離れる",min:-6,max:0,good:"相手は引き止めず、再び景色に目を向けた。"},
+  {label:"急に大声で話しかけて驚かせる",min:-7,max:1,good:"相手は肩を揺らし、驚いた顔でこちらを見た。"}
+ ]},
+ {test:/猫|亀吉|虫|からくり|実験|薬草|器具|植物|小石|道具を組み立て|図面|珍しい形/,choices:[
+  {label:"何をしているのか、順番に説明してもらう",min:2,max:8,good:"相手は目を輝かせ、見つけたことを詳しく話した。"},
+  {label:"自分も手伝えることがあるか尋ねる",min:3,max:9,good:"相手は簡単な役目を任せ、隣で見守った。"},
+  {label:"よく分からないまま道具や対象に触る",min:-9,max:-2,good:"相手は慌てて止めた。「先に説明を聞いてくれないか」"},
+  {label:"失敗してもいいから試してみようと励ます",min:1,max:9,good:"相手は考え込み、それから新しい方法を試してみた。"},
+  {label:"「それ、何の役に立つの？」とぶっきらぼうに聞く",min:-5,max:4,good:"相手は少しむっとしたが、用途を説明し始めた。"}
+ ]}
+];
+function choicesForScene(scene,n){
+ const match=contextualChoiceSets.find(group=>group.test.test(scene));
+ if(match)return match.choices;
+ return [...(scenarioChoices[n]||[]),...(extraChoices[n]||[])];
+}
+
 function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}
  if(!safePeriod()){
   let end=null;
@@ -420,7 +471,7 @@ function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=t
  const selectedScene=freshScenes[Math.floor(Math.random()*freshScenes.length)];
  recentScenes[n]=[selectedScene,...recentSceneList].slice(0,Math.min(10,pool.length-1));
  $("resultText").textContent=selectedScene;
- const allOptions=[...(scenarioChoices[n]||[]),...(extraChoices[n]||[])];
+ const allOptions=choicesForScene(selectedScene,n);
  const recent=recentOptions[n]||[];
  let fresh=allOptions.filter(o=>!recent.includes(o.label));
  if(fresh.length<4)fresh=allOptions;
