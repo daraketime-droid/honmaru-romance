@@ -34,6 +34,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:white;t
 <div class="progress"><i id="yearProgress" style="width:0%"></i></div>
 <p id="timeInfo" class="sub"></p>
 <p id="sceneText" class="sub"></p>
+<p id="ambientText" class="sub"></p>
 <div id="status" class="status"></div>
 </div>
 <div id="choicePanel" class="panel"><h2 id="choiceTitle">今日、誰と過ごす？</h2><p id="choiceHint" class="sub"></p><div id="choices" class="grid two"></div></div>
@@ -54,8 +55,10 @@ function dayOfMonth(d){return ((d-1)%DAYS_PER_MONTH)+1}
 function safePeriod(){return day<=SAFE_DAYS}
 function renderStart(){$("starterChoices").innerHTML=starters.map(n=>`<button onclick="chooseStarter('${n}')"><b>${n}</b><br><small>初期好感度 30</small></button>`).join("")}
 function chooseStarter(n){starter=n;aff={};all.forEach(x=>aff[x]=30);day=1;warnings=0;visitedOther=false;otherVisits=0;ended=false;visitedTargets=new Set();routeTargets=new Set();log=[];$("start").classList.add("hidden");$("game").classList.remove("hidden");$("starterLabel").textContent="初期刀："+starter;addLog(starter+"を初期刀に選んだ。");showDay()}
-function renderStatus(){$("status").innerHTML=all.map(n=>`<div class="stat"><b>${n}</b><span>${aff[n]}</span>${routeTargets.has(n)?'<div class="note"><b>恋愛ルート進行中</b></div>':''}<div class="bar"><i style="width:${Math.max(0,Math.min(100,aff[n]))}%"></i></div></div>`).join("")}
-function showDay(){if(ended)return;const m=monthOf(day),d=dayOfMonth(day);$("dayTitle").textContent=m+"ヶ月目・"+d+"日目";$("yearProgress").style.width=((day-1)/TOTAL_DAYS*100)+"%";$("timeInfo").textContent=`一年間の ${day}/${TOTAL_DAYS} 日目　｜　${safePeriod()?"1ヶ月目：エンディング判定なし":"通常期間（条件により分岐）"}`;$("sceneText").textContent=day===1?starter+"と朝の挨拶を交わした。今日は誰と過ごそうか。":"朝になった。"+starter+"はいつものように、あなたの様子をうかがっている。";renderStatus();$("choicePanel").classList.remove("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.add("hidden");$("choiceTitle").textContent="今日、誰と過ごす？";$("choiceHint").textContent="今日は1回だけ行動できます。初期刀以外を選んでも、日々の選択履歴は残ります。";$("choices").innerHTML=all.map(n=>`<button onclick="chooseTarget('${n}')"><div class="sword"><b>${n}</b><span class="pill">好感度 ${aff[n]}</span></div></button>`).join("")}
+function affinityMood(n){const a=aff[n];if(a<=10)return "距離を置かれている";if(a<30)return "まだ少しよそよそしい";if(a<50)return "いつも通りに接している";if(a<70)return "あなたを気にかけている";return "特別な想いを抱いている"}
+function renderStatus(){$("status").innerHTML=all.map(n=>`<div class="stat"><b>${n}</b><span>${aff[n]}</span><div class="note">${affinityMood(n)}${routeTargets.has(n)?'・恋愛ルート進行中':''}</div><div class="bar"><i style="width:${Math.max(0,Math.min(100,aff[n]))}%"></i></div></div>`).join("")}
+function affinityDialogue(n){const a=aff[n];if(a<=10)return n+"はあなたに気づくと、何も言わずに視線をそらした。";if(a<30)return n+"は少し迷った様子で会釈をした。";if(a<50)return n+"はいつも通りに挨拶を交わした。";if(a<70)return n+"はあなたの様子を気にして、さりげなく声をかけた。";return n+"はあなたを見つけると、嬉しそうに表情を和らげた。"}
+function showDay(){if(ended)return;const m=monthOf(day),d=dayOfMonth(day);$("dayTitle").textContent=m+"ヶ月目・"+d+"日目";$("yearProgress").style.width=((day-1)/TOTAL_DAYS*100)+"%";$("timeInfo").textContent=`一年間の ${day}/${TOTAL_DAYS} 日目　｜　${safePeriod()?"1ヶ月目：エンディング判定なし":"通常期間（条件により分岐）"}`;$("sceneText").textContent=day===1?starter+"と朝の挨拶を交わした。今日は誰と過ごそうか。":"朝になった。"+starter+"はいつものように、あなたの様子をうかがっている。";const bystanders=shuffle(all.filter(n=>n!==starter)).slice(0,2);$("ambientText").textContent="本丸の様子："+bystanders.map(affinityDialogue).join(" ");renderStatus();$("choicePanel").classList.remove("hidden");$("resultPanel").classList.add("hidden");$("endingPanel").classList.add("hidden");$("choiceTitle").textContent="今日、誰と過ごす？";$("choiceHint").textContent="今日は1回だけ行動できます。初期刀以外を選んでも、日々の選択履歴は残ります。";$("choices").innerHTML=all.map(n=>`<button onclick="chooseTarget('${n}')"><div class="sword"><b>${n}</b><span class="pill">好感度 ${aff[n]}</span></div></button>`).join("")}
 const scenes={
 "加州清光":[
 "清光は鏡の前で髪を整えていた。「ねえ、今日の俺、かわいくない？」",
@@ -123,51 +126,94 @@ const scenes={
 "長曽祢は道具を片づけていた。「手伝ってくれるのか？　助かる」",
 "「何か悩みでもあるのか」長曽祢は真剣な顔でこちらを見た。"
 ]};
-const responseOptions=[
-{label:"素直に気持ちを伝える",delta:1},
-{label:"相手の話をじっくり聞く",delta:1},
-{label:"一緒に何かをして過ごす",delta:1},
-{label:"いつも通りに会話する",delta:0},
-{label:"少しからかってみる",delta:0},
-{label:"用事を思い出して切り上げる",delta:-1},
-{label:"そっけなく返事をする",delta:-1}
-];
+const scenarioChoices={
+"加州清光":[
+ {label:"「今日の髪も似合っているね」と、鏡越しに褒める",min:2,max:8,good:"清光は鏡越しに目を細めた。「でしょ？ ちゃんと見ててよね」"},
+ {label:"「その髪飾り、前のほうが好きだった」と正直に言う",min:-8,max:-2,good:"清光は髪飾りに触れ、少し不機嫌そうに口を尖らせた。"},
+ {label:"清光に頼んで、自分の髪も整えてもらう",min:3,max:10,good:"「しょうがないなあ」と言いながら、清光は楽しそうに櫛を手に取った。"},
+ {label:"鏡をのぞき込んで「俺のほうがかわいいかも」と張り合う",min:-5,max:4,good:"清光は笑ったが、どこか本気で張り合っているようだった。"},
+ {label:"急ぎの用事を思い出したふりをして立ち去る",min:-7,max:0,good:"清光は引き止めず、鏡に向き直った。"}],
+"山姥切国広":[
+ {label:"「その布、今日は少し違う結び方だな」と気づいたことを伝える",min:2,max:7,good:"国広は布を押さえた。「……よく見ているんだな」"},
+ {label:"「隠れていないで、隣で一緒に庭を見よう」と誘う",min:3,max:9,good:"国広はためらったあと、少しだけ近くに座った。"},
+ {label:"「そんなに自信がないなら、今日は何も任せられないな」と言う",min:-10,max:-3,good:"国広の表情が固まった。「……そうか」"},
+ {label:"何も聞かず、黙って隣に座る",min:-1,max:5,good:"しばらくして、国広の肩から力が抜けた。"},
+ {label:"布を勝手に引っ張って、顔を見ようとする",min:-8,max:2,good:"国広は慌てて布を押さえ、警戒するようにこちらを見た。"}],
+"陸奥守吉行":[
+ {label:"「今日はどんな新しいことを考えちゅう？」と話を聞く",min:3,max:9,good:"陸奥守は目を輝かせ、身振りを交えて語り始めた。"},
+ {label:"「その話、昔のままじゃないか？」と冗談めかして突っ込む",min:-3,max:6,good:"陸奥守は一瞬きょとんとし、それから声を上げて笑った。"},
+ {label:"一緒に外へ出て、遠くまで走ってみようと誘う",min:2,max:10,good:"「よっしゃ、競争じゃ！」陸奥守は先に駆け出した。"},
+ {label:"話を聞かず、途中で自分の用事を始める",min:-9,max:-2,good:"陸奥守は言葉を止め、少し寂しそうに笑った。"},
+ {label:"「新しい時代より、今ここで休もう」と縁側を指す",min:0,max:7,good:"陸奥守は空を見上げてから、隣に腰を下ろした。"}],
+"蜂須賀虎徹":[
+ {label:"刀の手入れを手伝い、細かな仕事ぶりを褒める",min:2,max:8,good:"蜂須賀は満足そうにうなずいた。「分かっているじゃないか」"},
+ {label:"「本物かどうかより、あなた自身の話を聞きたい」と言う",min:3,max:10,good:"蜂須賀は少し驚き、静かにこちらを見つめた。"},
+ {label:"長曽祢虎徹の話題を出して反応をうかがう",min:-10,max:3,good:"蜂須賀の手が止まった。「……なぜ今、その名を？」"},
+ {label:"手入れ道具を雑に扱い、早く終わらせようとする",min:-8,max:-2,good:"蜂須賀は道具を取り戻し、冷ややかな目を向けた。"},
+ {label:"「浦島は元気？」と弟の様子を尋ねる",min:1,max:8,good:"蜂須賀の表情が和らいだ。「ああ、今日も元気にしているよ」"}],
+"歌仙兼定":[
+ {label:"隣で「はるがきた あぁはるがきた はるがきた」と朗らかに歌う",min:-9,max:-2,good:"歌仙は花鋏を止めた。「……君、その歌を今ここで歌うのかい？」"},
+ {label:"「それより歌仙の和菓子が食べたい」と頼む",min:3,max:10,good:"歌仙は呆れたように息をついた。「仕方ないね。お茶も淹れよう」"},
+ {label:"花の向きを尋ね、なぜその枝を選んだのか聞く",min:2,max:8,good:"歌仙は表情を明るくし、枝ぶりと季節の話を始めた。"},
+ {label:"「花なら適当に挿せばいいのでは」と言う",min:-10,max:-3,good:"歌仙の笑みが消えた。「風雅というものを、少しは学ぶべきだね」"},
+ {label:"黙って花器や水桶を片づける",min:0,max:6,good:"歌仙は何も言わなかったが、片づけ終わると茶菓子を差し出した。"}],
+"山姥切長義":[
+ {label:"書類をのぞき込み「手伝えることはある？」と尋ねる",min:2,max:8,good:"長義は書類を一枚差し出した。「では、君の目で確認してくれ」"},
+ {label:"「当然、俺を選ぶと思っていた」と言い返す",min:-2,max:7,good:"長義は口元に笑みを浮かべた。「言うようになったね」"},
+ {label:"仕事中だと分かっていて、無理に遊びに誘う",min:-7,max:1,good:"長義はため息をついた。「これを片づけてからだ」"},
+ {label:"刀装の点検を見守り、気づいた点を一つ伝える",min:1,max:9,good:"長義は指摘を確かめ、「よく見ている」とうなずいた。"},
+ {label:"「偉そうだね」とだけ言って立ち去る",min:-8,max:0,good:"長義は引き止めず、再び書類に目を落とした。"}],
+"大和守安定":[
+ {label:"稽古の相手を申し出て、一本だけ勝負する",min:2,max:9,good:"安定は嬉しそうに木刀を構えた。「手加減しないよ」"},
+ {label:"汗を拭く手拭いと冷たい飲み物を渡す",min:3,max:8,good:"「気が利くね。ありがとう」と安定は笑った。"},
+ {label:"「疲れているなら、今日は休んだら？」と気遣う",min:0,max:7,good:"安定は少し考え、「じゃあ、少しだけ話そうかな」と隣に座った。"},
+ {label:"稽古の失敗を笑いものにする",min:-9,max:-2,good:"安定は笑わず、木刀を静かに置いた。"},
+ {label:"花壇の花を一緒に見て、名前を当てる遊びをする",min:1,max:10,good:"安定は当たるたびに得意げに笑い、外れると悔しそうにした。"}],
+"肥前忠広":[
+ {label:"隣に座り「猫、逃げちまったな」と話しかける",min:1,max:7,good:"肥前は猫の消えた先を見た。「……別に追いかけてねえよ」"},
+ {label:"手入れ道具を差し出し、黙って手伝う",min:2,max:9,good:"肥前は少し驚いたあと、道具を受け取った。「気が利くじゃねえか」"},
+ {label:"「待ってたんだろ？」とからかう",min:-3,max:6,good:"肥前は顔をしかめた。「うるせえ。勝手に決めんな」"},
+ {label:"刀の扱いを軽く見て、手入れを後回しにさせる",min:-10,max:-3,good:"肥前の目つきが鋭くなった。「刀を何だと思ってやがる」"},
+ {label:"何も聞かず、猫用のおやつをそっと置いておく",min:0,max:8,good:"肥前はおやつを見て、ほんの少しだけ口元を緩めた。"}],
+"南海太郎朝尊":[
+ {label:"実験の目的と危険性を、納得するまで質問する",min:2,max:9,good:"南海は嬉しそうに眼鏡を直した。「よい質問だね」"},
+ {label:"説明を最後まで聞かず、すぐ実験を始めようとする",min:-8,max:1,good:"南海は慌てて器具を押さえた。「待ちたまえ、手順がある」"},
+ {label:"記録帳を一緒に整理し、抜けている箇所を探す",min:3,max:10,good:"南海は記録を見比べ、「君がいて助かったよ」と笑った。"},
+ {label:"「安全性はたぶん大丈夫」を真に受けて目を離す",min:-10,max:-2,good:"南海は青ざめて器具を片づけた。「目を離してはいけない！」"},
+ {label:"人の心も実験みたいに測れるのか、と尋ねる",min:-1,max:7,good:"南海は少し考え込み、いつもより真剣に答えた。"}],
+"浦島虎徹":[
+ {label:"亀吉に挨拶してから、浦島と一緒に遊ぶ",min:2,max:8,good:"浦島は大喜びで亀吉を見せてくれた。「仲良くしてやってね！」"},
+ {label:"海の話を聞き、行ってみたい場所を尋ねる",min:3,max:9,good:"浦島は目を輝かせ、行きたい場所を次々に挙げた。"},
+ {label:"手作りのおやつを受け取り、味の感想を伝える",min:1,max:10,good:"「ほんと？ また作ってくるよ！」浦島は嬉しそうに笑った。"},
+ {label:"子ども扱いして、話をまともに聞かない",min:-8,max:-2,good:"浦島は頬をふくらませた。「もう、ちゃんと聞いてよ！」"},
+ {label:"亀吉を怖がらせるようないたずらをする",min:-10,max:-4,good:"浦島は亀吉を抱き上げ、珍しく真剣な顔で抗議した。"}],
+"長曽祢虎徹":[
+ {label:"木刀を持って、稽古をつけてほしいと頼む",min:2,max:9,good:"長曽祢は力強くうなずいた。「よし、基礎から見てやろう」"},
+ {label:"稽古の後片づけを手伝い、汗を拭く布を渡す",min:2,max:8,good:"「助かる。気遣いのできる主だな」と長曽祢は笑った。"},
+ {label:"蜂須賀の前で、長曽祢をわざと褒めちぎる",min:-7,max:5,good:"長曽祢は困ったように頭をかいた。「あまり大げさに言うな」"},
+ {label:"疲れているのに、休まず稽古を続けるよう求める",min:-9,max:-2,good:"長曽祢は木刀を下ろした。「鍛錬にも限度がある」"},
+ {label:"悩みを打ち明けて、長曽祢の意見を聞く",min:1,max:10,good:"長曽祢は茶化さず、最後まで話を聞いてくれた。"}]
+};
 function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+let currentOptions=[];
 function chooseTarget(n){if(ended)return;target=n;if(n!==starter){visitedOther=true;otherVisits++;visitedTargets.add(n)}
  if(!safePeriod()){
   let end=null;
-  if(n!==starter){
-   if(aff[n]<=10)end=["バッドエンド",n+"の好感度は限界まで下がってしまった。もう、あなたに向けられる想いは残っていない。"];
-   else end=checkEnding(false);
-   if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}
-  }else end=checkSelfEnding();
+  if(n!==starter){if(aff[n]<=10)end=["バッドエンド",n+"の好感度は限界まで下がってしまった。もう、あなたに向けられる想いは残っていない。"];if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}}
+  else{end=checkSelfEnding();if(!end)end=checkEnding(false);if(!end&&aff[n]>=70&&!routeTargets.has(n)){routeTargets.add(n);addLog(n+"との恋愛ルートに入った。");}}
   if(end){finish(end[0],end[1]);return}
  }
  addLog(n+"と過ごすことにした。");$("choicePanel").classList.add("hidden");$("resultPanel").classList.remove("hidden");$("resultTitle").textContent=n+"との時間";
  const pool=scenes[n]||[n+"はあなたに気づき、話しかけてきた。"];
- $("resultText").textContent=pool[Math.floor(Math.random()*pool.length)];
- const options=shuffle(responseOptions).slice(0,4);
- $("resultChoices").innerHTML=options.map((o,i)=>`<button onclick="reply(${o.delta})">${o.label}</button>`).join("");
+ if(n==="歌仙兼定"){$("resultText").textContent="歌仙は花を生けている。枝の角度を慎重に整え、こちらに気づくと「何か用かい？」と尋ねた。";}
+ else {$("resultText").textContent=pool[Math.floor(Math.random()*pool.length)];}
+ currentOptions=shuffle(scenarioChoices[n]||[{label:"相手の話を聞く",min:0,max:5,good:n+"は穏やかにうなずいた。"}]).slice(0,4);
+ $("resultChoices").innerHTML=currentOptions.map((o,i)=>`<button onclick="reply(${i})">${o.label}</button>`).join("");
 }
-function reply(delta){if(ended)return;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta*5));
- const reactions=delta>0?[
- target+"は嬉しそうに笑った。好感度 +5。",
- target+"は少し照れたように視線をそらした。好感度 +5。",
- target+"は「また話そう」と、いつもより柔らかな声で言った。好感度 +5。",
- target+"はあなたの言葉を大切そうに受け止めた。好感度 +5。"
- ]:delta<0?[
- target+"は小さく息をつき、距離を置いた。好感度 -5。",
- target+"の表情から笑みが消えた。好感度 -5。",
- target+"は「そうか」とだけ答えた。好感度 -5。",
- target+"は何も言わず、話題を変えた。好感度 -5。"
- ]:[
- target+"は気負わずに話せたことを喜んでいるようだ。好感度の変化はない。",
- target+"との間に、いつも通りの穏やかな時間が流れた。好感度の変化はない。",
- target+"は安心したように微笑んだ。好感度の変化はない。",
- target+"は他愛ない話に付き合ってくれた。好感度の変化はない。"
- ];
- let line=reactions[Math.floor(Math.random()*reactions.length)];
- if(target!==starter&&delta>0)line+="\n"+starter+"の視線が気になる。";
+function reply(index){if(ended)return;const o=currentOptions[index];if(!o)return;const delta=Math.floor(Math.random()*(o.max-o.min+1))+o.min;aff[target]=Math.max(-100,Math.min(120,aff[target]+delta));
+ const amount=delta>0?"好感度 +"+delta+"。":delta<0?"好感度 "+delta+"。":"好感度の変化はなかった。";
+ let line=o.good+"\n"+amount;
+ if(target!==starter&&delta>0&&Math.random()<0.45)line+="\n"+starter+"が、少し離れたところからこちらを見ていた。";
  addLog(line);renderStatus();$("resultText").textContent=line;$("resultChoices").innerHTML='<button class="primary" onclick="advanceDay()">一日を終える</button>'}
 function advanceDay(){if(ended)return;$("resultPanel").classList.add("hidden");if(day>=TOTAL_DAYS){const romance=[...routeTargets].filter(x=>aff[x]>=70).sort((x,y)=>aff[y]-aff[x]);if(romance.length)finish("恋愛エンド","一年間を通して、あなたと"+romance[0]+"は互いの想いを確かめ合った。これからは、恋人として同じ時間を歩んでいく。");else finish("一年の終わり","一年間の本丸での日々が過ぎた。あなたが築いた関係は、これからも続いていく。");return}day++;if(dayOfMonth(day)===1)addLog(monthOf(day)+"ヶ月目に入った。");showDay()}
 function checkSelfEnding(){const n=starter,a=aff[starter];
